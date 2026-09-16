@@ -1,0 +1,2 @@
+# metodos-jacobi-gauss-seidel
+
