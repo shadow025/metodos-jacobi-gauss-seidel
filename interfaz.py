@@ -22,6 +22,12 @@ from metodos_raices import (
     newton_raphson,
     polinomio_a_texto,
 )
+from procedimiento import (
+    procedimiento_bairstow,
+    procedimiento_muller,
+    procedimiento_newton,
+    procedimiento_sistema,
+)
 
 FUENTE_MONO = ("Menlo", 11)
 
@@ -114,6 +120,58 @@ class Resumen(ttk.Frame):
         self.texto.configure(state="disabled")
 
 
+class AreaProcedimiento(ttk.Frame):
+    """Texto desplazable con el procedimiento paso a paso y un botón para copiarlo."""
+
+    def __init__(self, parent):
+        super().__init__(parent, padding=6)
+        barra = ttk.Frame(self)
+        barra.pack(fill="x", pady=(0, 4))
+        ttk.Label(barra, text="Cada número se obtiene con la fórmula sustituida. "
+                              "Presiona Resolver para generarlo.", foreground="#555").pack(side="left")
+        ttk.Button(barra, text="Copiar", command=self.copiar).pack(side="right")
+
+        marco = ttk.Frame(self)
+        marco.pack(fill="both", expand=True)
+        self.texto = tk.Text(marco, wrap="none", font=FUENTE_MONO, relief="flat",
+                             background="#fbfbfb", padx=8, pady=6)
+        sy = ttk.Scrollbar(marco, orient="vertical", command=self.texto.yview)
+        sx = ttk.Scrollbar(marco, orient="horizontal", command=self.texto.xview)
+        self.texto.configure(yscrollcommand=sy.set, xscrollcommand=sx.set)
+        self.texto.grid(row=0, column=0, sticky="nsew")
+        sy.grid(row=0, column=1, sticky="ns")
+        sx.grid(row=1, column=0, sticky="ew")
+        marco.rowconfigure(0, weight=1)
+        marco.columnconfigure(0, weight=1)
+        self.texto.configure(state="disabled")
+
+    def mostrar(self, contenido):
+        self.texto.configure(state="normal")
+        self.texto.delete("1.0", "end")
+        self.texto.insert("1.0", contenido)
+        self.texto.configure(state="disabled")
+
+    def copiar(self):
+        contenido = self.texto.get("1.0", "end").strip()
+        if contenido:
+            self.clipboard_clear()
+            self.clipboard_append(contenido)
+
+
+def crear_area_resultados(parent, titulo_tabla="Tabla de iteraciones"):
+    """
+    Cuaderno de resultados con dos pestañas: la tabla (devuelta como frame para
+    que cada pestaña ponga su Treeview y resumen) y el procedimiento paso a paso.
+    Devuelve (cuaderno, frame_tabla, area_procedimiento).
+    """
+    cuaderno = ttk.Notebook(parent)
+    frame_tabla = ttk.Frame(cuaderno, padding=6)
+    cuaderno.add(frame_tabla, text=f"  {titulo_tabla}  ")
+    area = AreaProcedimiento(cuaderno)
+    cuaderno.add(area, text="  Procedimiento paso a paso  ")
+    return cuaderno, frame_tabla, area
+
+
 # ---------------------------------------------------------------------------
 # Pestaña: Jacobi / Gauss-Seidel
 # ---------------------------------------------------------------------------
@@ -149,8 +207,8 @@ class PestanaSistemas(ttk.Frame):
         ttk.Button(botones, text="Cargar ejemplo", command=self.cargar_ejemplo).pack(side="left")
         ttk.Button(botones, text="Resolver", command=self.resolver).pack(side="right")
 
-        resultados = ttk.Frame(self)
-        resultados.grid(row=0, column=1, sticky="nsew")
+        cuaderno, resultados, self.procedimiento = crear_area_resultados(self, "Tablas de iteraciones")
+        cuaderno.grid(row=0, column=1, sticky="nsew")
         resultados.rowconfigure(0, weight=1)
         resultados.rowconfigure(1, weight=1)
         resultados.columnconfigure(0, weight=1)
@@ -227,14 +285,18 @@ class PestanaSistemas(ttk.Frame):
         metodo = self.var_metodo.get()
         self.marco_jacobi.grid_remove()
         self.marco_gs.grid_remove()
+        textos = []
         if metodo in ("jacobi", "ambos"):
             self.marco_jacobi.grid()
-            self.mostrar(self.tabla_jacobi, self.resumen_jacobi,
-                         jacobi(A, b, x0=x0, tol=tol, max_iter=max_iter), dominante)
+            resultado = jacobi(A, b, x0=x0, tol=tol, max_iter=max_iter)
+            self.mostrar(self.tabla_jacobi, self.resumen_jacobi, resultado, dominante)
+            textos.append(procedimiento_sistema("Jacobi", A, b, resultado, tol))
         if metodo in ("gs", "ambos"):
             self.marco_gs.grid()
-            self.mostrar(self.tabla_gs, self.resumen_gs,
-                         gauss_seidel(A, b, x0=x0, tol=tol, max_iter=max_iter), dominante)
+            resultado = gauss_seidel(A, b, x0=x0, tol=tol, max_iter=max_iter)
+            self.mostrar(self.tabla_gs, self.resumen_gs, resultado, dominante)
+            textos.append(procedimiento_sistema("Gauss-Seidel", A, b, resultado, tol))
+        self.procedimiento.mostrar("\n\n\n".join(textos))
 
 
 # ---------------------------------------------------------------------------
@@ -272,8 +334,8 @@ class PestanaNewton(ttk.Frame):
         ttk.Button(botones, text="Cargar ejemplo", command=self.cargar_ejemplo).pack(side="left")
         ttk.Button(botones, text="Resolver", command=self.resolver).pack(side="right")
 
-        resultados = ttk.LabelFrame(self, text="Iteraciones", padding=6)
-        resultados.grid(row=0, column=1, sticky="nsew")
+        cuaderno, resultados, self.procedimiento = crear_area_resultados(self)
+        cuaderno.grid(row=0, column=1, sticky="nsew")
         self.tabla = crear_tabla(resultados, ("i", "x_i", "f(x_i)", "f'(x_i)", "x_i+1", "εa (%)"))
         self.resumen = Resumen(resultados, alto=5)
         self.resumen.pack(fill="x", pady=(6, 0))
@@ -295,10 +357,12 @@ class PestanaNewton(ttk.Frame):
             texto_df = self.var_df.get().strip()
             if texto_df:
                 df, origen = crear_funcion(texto_df), f"f'(x) = {texto_df} (ingresada)"
+                expr_df = texto_df
             else:
                 df, texto_derivada = derivada_simbolica(self.var_f.get())
                 origen = (f"f'(x) = {texto_derivada} (derivada simbólica)" if df
                           else "f'(x) por diferencias centrales (derivada numérica)")
+                expr_df = texto_derivada if df else "(derivada numérica por diferencias centrales)"
             resultado = newton_raphson(f, x0, df=df, tol=tol, max_iter=max_iter)
         except (ValueError, ZeroDivisionError, OverflowError) as exc:
             messagebox.showerror("Error", str(exc))
@@ -314,6 +378,7 @@ class PestanaNewton(ttk.Frame):
             f"Raíz ≈ {formatear_numero(resultado['raiz'], 8)}    "
             f"f(raíz) = {formatear_numero(resultado['f_raiz'], 10)}"
         )
+        self.procedimiento.mostrar(procedimiento_newton(self.var_f.get().strip(), expr_df, resultado, tol))
 
 
 # ---------------------------------------------------------------------------
@@ -344,8 +409,8 @@ class PestanaMuller(ttk.Frame):
         ttk.Button(botones, text="Cargar ejemplo", command=self.cargar_ejemplo).pack(side="left")
         ttk.Button(botones, text="Resolver", command=self.resolver).pack(side="right")
 
-        resultados = ttk.LabelFrame(self, text="Iteraciones", padding=6)
-        resultados.grid(row=0, column=1, sticky="nsew")
+        cuaderno, resultados, self.procedimiento = crear_area_resultados(self)
+        cuaderno.grid(row=0, column=1, sticky="nsew")
         self.tabla = crear_tabla(resultados, ("i", "x0", "x1", "x2", "x3", "εa (%)"))
         self.resumen = Resumen(resultados, alto=4)
         self.resumen.pack(fill="x", pady=(6, 0))
@@ -383,6 +448,7 @@ class PestanaMuller(ttk.Frame):
             f"Raíz ({tipo}) ≈ {formatear_numero(resultado['raiz'], 8)}\n"
             f"f(raíz) = {formatear_numero(resultado['f_raiz'], 10)}"
         )
+        self.procedimiento.mostrar(procedimiento_muller(self.var_f.get().strip(), resultado, tol))
 
 
 # ---------------------------------------------------------------------------
@@ -419,8 +485,9 @@ class PestanaBairstow(ttk.Frame):
         ttk.Button(botones, text="Cargar ejemplo", command=self.cargar_ejemplo).pack(side="left")
         ttk.Button(botones, text="Resolver", command=self.resolver).pack(side="right")
 
-        resultados = ttk.LabelFrame(self, text="Iteraciones por factor cuadrático x² - r x - s", padding=6)
-        resultados.grid(row=0, column=1, sticky="nsew")
+        cuaderno, resultados, self.procedimiento = crear_area_resultados(
+            self, "Iteraciones por factor cuadrático x² - r x - s")
+        cuaderno.grid(row=0, column=1, sticky="nsew")
         self.tabla = crear_tabla(resultados, self.COLUMNAS)
         self.resumen = Resumen(resultados, alto=8)
         self.resumen.pack(fill="x", pady=(6, 0))
@@ -480,6 +547,7 @@ class PestanaBairstow(ttk.Frame):
         if not resultado["convergio"]:
             lineas.append("\n⚠ Algún factor no convergió: prueba otros r, s o más iteraciones.")
         self.resumen.mostrar("\n".join(lineas))
+        self.procedimiento.mostrar(procedimiento_bairstow(resultado, tol))
 
 
 # ---------------------------------------------------------------------------

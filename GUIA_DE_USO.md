@@ -40,7 +40,15 @@ python interfaz.py
 Se abre una ventana con cuatro pestañas. En todas:
 
 - **Cargar ejemplo** llena los campos con el ejemplo de clase / del libro.
-- **Resolver** ejecuta el método y muestra la tabla de iteraciones y el resumen.
+- **Resolver** ejecuta el método y llena dos sub-pestañas a la derecha:
+  - **Tabla de iteraciones**: los valores de cada iteración y el resumen
+    (solución o raíz, si convergió y en cuántas iteraciones).
+  - **Procedimiento paso a paso**: el desarrollo completo como se haría a mano:
+    verificación de dominancia y despejes (Jacobi / Gauss-Seidel), cada
+    evaluación de f y f' (Newton-Raphson), los valores h, δ, a, b, c y el
+    discriminante (Müller), o los coeficientes bᵢ, cᵢ, el sistema para Δr y Δs
+    y la reducción del polinomio (Bairstow). El botón **Copiar** lo manda al
+    portapapeles para pegarlo en un reporte.
 - Si algún dato está mal escrito, aparece un mensaje explicando qué corregir.
 
 ### 3.1 Jacobi / Gauss-Seidel

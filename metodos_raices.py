@@ -237,7 +237,15 @@ def muller(f, x0, x1, x2, tol=1e-4, max_iter=100):
         x3 = _como_real_si_es_posible(x3)
         error = error_relativo_porcentual(x3, x2)
 
-        historial.append({"i": k, "x0": x0, "x1": x1, "x2": x2, "x3": x3, "error": error})
+        historial.append({
+            "i": k, "x0": x0, "x1": x1, "x2": x2, "x3": x3, "error": error,
+            # valores intermedios (para mostrar el procedimiento paso a paso)
+            "fx0": f(x0), "fx1": f(x1), "fx2": c,
+            "h0": h0, "h1": h1, "d0": d0, "d1": d1,
+            "a": a, "b": b, "c": c,
+            "discriminante": _como_real_si_es_posible(discriminante),
+            "denominador": _como_real_si_es_posible(denominador),
+        })
 
         # Enfoque secuencial del libro: se descarta el punto más viejo
         x0, x1, x2 = x1, x2, x3

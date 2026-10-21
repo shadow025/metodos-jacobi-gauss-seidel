@@ -15,8 +15,12 @@ para ingenieros* (secciones 6.2, 7.2 y 7.5) y reproducen sus ejemplos 6.3, 7.2 y
 ## Contenido
 
 - `interfaz.py` — **interfaz gráfica** (Tkinter) con una pestaña por método:
-  ingresas los datos, presionas *Resolver* y ves la tabla de iteraciones y el
-  resultado. Cada pestaña tiene un botón *Cargar ejemplo* con el ejemplo del libro.
+  ingresas los datos, presionas *Resolver* y ves la tabla de iteraciones, el
+  resultado y el **procedimiento paso a paso** (cada fórmula con los números
+  sustituidos, listo para copiar). Cada pestaña tiene un botón *Cargar ejemplo*
+  con el ejemplo del libro.
+- `procedimiento.py` — genera el procedimiento paso a paso en texto a partir de
+  los resultados de cualquiera de los cinco métodos.
 - `metodos_iterativos.py` — funciones `jacobi()`, `gauss_seidel()` y
   `es_diagonalmente_dominante()`.
 - `metodos_raices.py` — funciones `newton_raphson()`, `muller()`, `bairstow()` y
@@ -25,7 +29,7 @@ para ingenieros* (secciones 6.2, 7.2 y 7.5) y reproducen sus ejemplos 6.3, 7.2 y
 - `ejemplo.py` — sistema 3x3 de ejemplo resuelto con Jacobi y Gauss-Seidel.
 - `ejemplo_raices.py` — ejemplos 6.3, 7.2 y 7.3 del libro resueltos con
   Newton-Raphson, Müller y Bairstow, con sus tablas de iteraciones.
-- `tests/` — pruebas unitarias (`unittest`) de los cinco métodos.
+- `tests/` — pruebas unitarias (`unittest`) de los cinco métodos y del procedimiento.
 
 ## Instalación
 
