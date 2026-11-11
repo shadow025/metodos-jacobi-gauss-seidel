@@ -351,5 +351,207 @@ const Procedimiento = (() => {
     return partes.join("\n\n") + "\n";
   }
 
-  return { sistema, newton, muller, bairstow, aLatex, n };
+  // -------------------------------------------------------------------------
+  // Diferenciación numérica
+  // -------------------------------------------------------------------------
+
+  /** "-3f_{0} + 4f_{1} - f_{2}" (omite los coeficientes cero). */
+  function combinacionTex(offsets, coefs) {
+    let texto = "";
+    offsets.forEach((k, i) => {
+      const c = coefs[i];
+      if (c === 0) return;
+      const mag = Math.abs(c) === 1 ? "" : String(Math.abs(c));
+      const termino = `${mag}f_{${k}}`;
+      if (!texto) texto = (c < 0 ? "-" : "") + termino;
+      else texto += ` ${c < 0 ? "-" : "+"} ${termino}`;
+    });
+    return texto;
+  }
+
+  const NOMBRE_TIPO = { progresiva: "progresiva (hacia adelante)", regresiva: "regresiva (hacia atrás)", centrada: "centrada" };
+
+  function derivada(texF, r, exacto) {
+    const e = r.esquema;
+    const B = [];
+    B.push(h("Planteamiento"));
+    B.push(mat(`f(x) &= ${texF}`));
+    B.push(par(`Se aproxima $f'(x_0)$ con la diferencia ${NOMBRE_TIPO[e.tipo]} de ${e.puntos} puntos, `
+      + "donde $x_k = x_0 + k\\,h$ y $f_k = f(x_k)$:"));
+    B.push(mat(
+      `f'(x_0) &\\approx ${frac(combinacionTex(e.offsets, e.coefs), `${e.den === 1 ? "" : e.den}h`)}`,
+      `\\text{Error de truncamiento} &= ${e.error}`,
+    ));
+    B.push(par(`Datos: $x_0 = ${n(r.x0)}$ y $h = ${n(r.h, 10)}$.`));
+
+    B.push(h("Paso 1. Evaluar la función en los puntos"));
+    B.push(mat(r.puntos.map((p) =>
+      `x_{${p.k}} &= ${n(r.x0)} ${p.k < 0 ? "-" : "+"} ${Math.abs(p.k)} \\cdot ${n(r.h, 10)} = ${n(p.x, 10)}`
+      + `, \\qquad f_{${p.k}} = f(${n(p.x, 10)}) = ${n(p.fx, 10)}`)));
+
+    B.push(h("Paso 2. Sustituir en la fórmula"));
+    const usados = r.puntos.filter((p) => p.coef !== 0);
+    const terminos = usados.map((pt, i) => {
+      const mag = `${Math.abs(pt.coef)} \\cdot ${p(pt.fx, 10)}`;
+      if (i === 0) return pt.coef < 0 ? `-${mag}` : mag;
+      return `${pt.coef < 0 ? "-" : "+"} ${mag}`;
+    }).join(" ");
+    B.push(mat(
+      `f'(x_0) &\\approx ${frac(terminos, `${e.den} \\cdot ${n(r.h, 10)}`)}`,
+      `&= ${frac(n(r.numerador, 12), n(e.den * r.h, 12))}`,
+      `&= ${n(r.valor, 10)}`,
+    ));
+
+    B.push(h("Resultado"));
+    B.push(mat(`f'(${n(r.x0)}) &\\approx ${n(r.valor, 10)}`));
+    if (exacto !== null && exacto !== undefined) {
+      const abs = Math.abs(r.valor - exacto);
+      B.push(par("Comparación con la derivada exacta:"));
+      B.push(mat(
+        `f'(${n(r.x0)}) &= ${n(exacto, 10)}`,
+        `\\text{Error absoluto} &= |${n(r.valor, 10)} - ${p(exacto, 10)}| = ${abs.toExponential(4)}`,
+        ...(exacto !== 0 ? [`\\text{Error relativo} &= ${n(abs / Math.abs(exacto) * 100, 8)}\\,\\%`] : []),
+      ));
+    }
+    return B;
+  }
+
+  // -------------------------------------------------------------------------
+  // Integración numérica
+  // -------------------------------------------------------------------------
+
+  /** Suma de términos "coef·f(x)" abreviada si hay demasiados. */
+  function listaTerminos(nodos) {
+    const MAX = 12;
+    const texto = (pt) => `${pt.coef === 1 ? "" : `${pt.coef}\\cdot`}${p(pt.fx, 8)}`;
+    if (nodos.length <= MAX) return nodos.map(texto).join(" + ");
+    return `${nodos.slice(0, 4).map(texto).join(" + ")} + \\cdots + ${nodos.slice(-3).map(texto).join(" + ")}`;
+  }
+
+  function integralCompuesta(titulo, formula, factor, r, texF, extra) {
+    const B = [];
+    B.push(h("Planteamiento"));
+    B.push(mat(`I &= \\int_{${n(r.a)}}^{${n(r.b)}} ${texF}\\,dx`));
+    B.push(par(`${titulo} con $n = ${r.n}$ subintervalos de ancho $h = \\dfrac{b - a}{n}$:`));
+    B.push(mat(formula));
+    if (extra) B.push(par(extra));
+    B.push(h("Paso 1. Ancho de cada subintervalo"));
+    B.push(mat(`h &= ${frac(`${n(r.b)} - ${p(r.a)}`, String(r.n))} = ${n(r.h, 10)}`));
+    B.push(h("Paso 2. Evaluar la función en los nodos"));
+    B.push(par("Los nodos son $x_i = a + i\\,h$; los coeficientes y valores completos están en la tabla."));
+    const MAX = 12;
+    const mostrar = r.nodos.length <= MAX ? r.nodos : [...r.nodos.slice(0, 4), ...r.nodos.slice(-3)];
+    B.push(mat(mostrar.map((pt) => `f(x_{${pt.i}}) &= f(${n(pt.x, 8)}) = ${n(pt.fx, 8)}`)));
+    if (r.nodos.length > MAX) B.push(par("Se muestran solo los primeros y últimos nodos; el resto está en la tabla."));
+    B.push(h("Paso 3. Sustituir en la fórmula"));
+    B.push(mat(
+      `I &\\approx ${factor(r)} \\left[ ${listaTerminos(r.nodos)} \\right]`,
+      `&= ${factor(r)} \\cdot ${n(r.suma, 10)}`,
+      `&= ${n(r.integral, 10)}`,
+    ));
+    return B;
+  }
+
+  const cierreIntegral = (B, r, referencia) => {
+    B.push(h("Resultado"));
+    B.push(mat(`I &\\approx ${n(r.integral, 10)}`));
+    if (referencia !== null && referencia !== undefined && Number.isFinite(referencia)) {
+      const abs = Math.abs(r.integral - referencia);
+      B.push(par("Comparación con un valor de referencia (Gauss-Legendre de 10 puntos sobre 16 subintervalos):"));
+      B.push(mat(
+        `I_{\\text{ref}} &= ${n(referencia, 10)}`,
+        `\\text{Error absoluto} &= ${abs.toExponential(4)}`,
+        ...(referencia !== 0 ? [`\\text{Error relativo} &= ${n(abs / Math.abs(referencia) * 100, 8)}\\,\\%`] : []),
+      ));
+    }
+    return B;
+  };
+
+  function trapecio(texF, r, referencia) {
+    const B = integralCompuesta("Regla del trapecio compuesta",
+      "I \\approx \\frac{h}{2}\\left[f(x_0) + 2\\sum_{i=1}^{n-1} f(x_i) + f(x_n)\\right]",
+      (q) => `\\frac{${n(q.h, 10)}}{2}`, r, texF,
+      "Error de truncamiento: $O(h^2)$. Cada subintervalo se aproxima con una recta.");
+    return cierreIntegral(B, r, referencia);
+  }
+
+  function simpson13(texF, r, referencia) {
+    const B = integralCompuesta("Regla de Simpson 1/3 compuesta",
+      "I \\approx \\frac{h}{3}\\left[f(x_0) + 4\\sum_{i\\ \\text{impar}} f(x_i) + 2\\sum_{i\\ \\text{par}} f(x_i) + f(x_n)\\right]",
+      (q) => `\\frac{${n(q.h, 10)}}{3}`, r, texF,
+      "Requiere $n$ par. Error de truncamiento: $O(h^4)$. Cada par de subintervalos se aproxima con una parábola.");
+    return cierreIntegral(B, r, referencia);
+  }
+
+  function simpson38(texF, r, referencia) {
+    const B = integralCompuesta("Regla de Simpson 3/8 compuesta",
+      "I \\approx \\frac{3h}{8}\\left[f(x_0) + 3\\sum_{i\\not\\equiv 0\\,(3)} f(x_i) + 2\\sum_{i\\equiv 0\\,(3)} f(x_i) + f(x_n)\\right]",
+      (q) => `\\frac{3 \\cdot ${n(q.h, 10)}}{8}`, r, texF,
+      "Requiere $n$ múltiplo de 3. Error de truncamiento: $O(h^4)$. Cada tres subintervalos se aproximan con una cúbica.");
+    return cierreIntegral(B, r, referencia);
+  }
+
+  function romberg(texF, r, referencia) {
+    const B = [];
+    B.push(h("Planteamiento"));
+    B.push(mat(`I &= \\int_{${n(r.a)}}^{${n(r.b)}} ${texF}\\,dx`));
+    B.push(par("Romberg mejora la regla del trapecio con extrapolación de Richardson. Primera columna (trapecio con $2^k$ subintervalos) y columnas siguientes:"));
+    B.push(mat(
+      "R_{k,0} &= \\frac{1}{2} R_{k-1,0} + h_k \\sum_{i\\ \\text{impar}} f(a + i\\,h_k)",
+      "R_{k,j} &= \\frac{4^{j} R_{k,j-1} - R_{k-1,j-1}}{4^{j} - 1}",
+      "\\varepsilon_a &= \\left|\\frac{R_{k,k} - R_{k-1,k-1}}{R_{k,k}}\\right| \\cdot 100\\,\\%",
+    ));
+    B.push(par(`Se detiene cuando $\\varepsilon_a < \\varepsilon_s = ${n(r.tol, 10)}\\,\\%$.`));
+
+    B.push(h("Nivel 0: un solo trapecio"));
+    B.push(mat(`h_0 &= ${n(r.b)} - ${p(r.a)} = ${n(r.b - r.a, 10)}`,
+      `R_{0,0} &= \\frac{h_0}{2}\\left[f(${n(r.a)}) + f(${n(r.b)})\\right] = ${n(r.R[0][0], 10)}`));
+
+    for (const nivel of r.niveles.slice(1)) {
+      const k = nivel.k;
+      B.push(sub(`Nivel ${k}: ${nivel.n} subintervalos`));
+      const lineas = [`h_{${k}} &= \\frac{${n(r.b - r.a)}}{${nivel.n}} = ${n(nivel.h, 10)}`];
+      const nuevos = nivel.nuevos.length <= 6 ? nivel.nuevos : [...nivel.nuevos.slice(0, 3), ...nivel.nuevos.slice(-2)];
+      lineas.push(`\\sum f(\\text{puntos nuevos}) &= ${nivel.nuevos.length <= 6
+        ? nuevos.map((q) => p(q.fx, 8)).join(" + ")
+        : `${nuevos.slice(0, 3).map((q) => p(q.fx, 8)).join(" + ")} + \\cdots + ${nuevos.slice(3).map((q) => p(q.fx, 8)).join(" + ")}`} = ${n(nivel.sumaNuevos, 10)}`);
+      lineas.push(`R_{${k},0} &= \\frac{${p(r.R[k - 1][0], 10)}}{2} + ${n(nivel.h, 10)} \\cdot ${p(nivel.sumaNuevos, 10)} = ${n(r.R[k][0], 10)}`);
+      for (let j = 1; j <= k; j++) {
+        lineas.push(`R_{${k},${j}} &= \\frac{${4 ** j} \\cdot ${p(r.R[k][j - 1], 10)} - ${p(r.R[k - 1][j - 1], 10)}}{${4 ** j - 1}} = ${n(r.R[k][j], 10)}`);
+      }
+      lineas.push(`\\varepsilon_a &= \\left|\\frac{${n(r.R[k][k], 10)} - ${p(r.R[k - 1][k - 1], 10)}}{${n(r.R[k][k], 10)}}\\right| \\cdot 100\\,\\% = ${n(nivel.error, 8)}\\,\\%`);
+      B.push(mat(lineas));
+      if (nivel.error < r.tol) B.push(par(`Como $${n(nivel.error, 8)}\\,\\% < ${n(r.tol, 10)}\\,\\%$, se detiene.`));
+    }
+    if (!r.convergio) B.push(par("Se alcanzó el máximo de niveles sin cumplir la tolerancia."));
+    return cierreIntegral(B, r, referencia);
+  }
+
+  function gauss(texF, r, referencia) {
+    const B = [];
+    B.push(h("Planteamiento"));
+    B.push(mat(`I &= \\int_{${n(r.a)}}^{${n(r.b)}} ${texF}\\,dx`));
+    B.push(par(`Cuadratura de Gauss-Legendre de $${r.n}$ puntos. Es exacta para polinomios de grado hasta $${2 * r.n - 1}$. `
+      + "Se cambia el intervalo $[a, b]$ a $[-1, 1]$:"));
+    B.push(mat(
+      "x &= \\frac{b - a}{2}\\,t + \\frac{b + a}{2}, \\qquad dx = \\frac{b - a}{2}\\,dt",
+      "I &\\approx \\frac{b - a}{2} \\sum_{i=1}^{n} w_i \\, f(x_i)",
+    ));
+    B.push(h("Paso 1. Cambio de variable"));
+    B.push(mat(`x &= ${n(r.mitad, 10)}\\,t + ${p(r.centro, 10)}`, `\\frac{b - a}{2} &= ${n(r.mitad, 10)}`));
+    B.push(h("Paso 2. Nodos y pesos"));
+    B.push(par("Los nodos $t_i$ son las raíces del polinomio de Legendre $P_n(t)$ y los pesos son $w_i = \\dfrac{2}{(1 - t_i^2)\\,[P_n'(t_i)]^2}$."));
+    B.push(mat(r.nodos.map((q, i) =>
+      `t_{${i + 1}} &= ${n(q.t, 10)}, \\quad w_{${i + 1}} = ${n(q.w, 10)}, \\quad x_{${i + 1}} = ${n(q.x, 10)}, \\quad f(x_{${i + 1}}) = ${n(q.fx, 10)}`)));
+    B.push(h("Paso 3. Sustituir en la fórmula"));
+    const terminos = r.nodos.map((q) => `${p(q.w, 8)} \\cdot ${p(q.fx, 8)}`).join(" + ");
+    B.push(mat(
+      `I &\\approx ${n(r.mitad, 10)} \\left[ ${r.nodos.length <= 8 ? terminos : `${r.nodos.slice(0, 3).map((q) => `${p(q.w, 8)} \\cdot ${p(q.fx, 8)}`).join(" + ")} + \\cdots`} \\right]`,
+      `&= ${n(r.mitad, 10)} \\cdot ${n(r.suma, 10)}`,
+      `&= ${n(r.integral, 10)}`,
+    ));
+    return cierreIntegral(B, r, referencia);
+  }
+
+  return { sistema, newton, muller, bairstow, derivada, trapecio, simpson13, simpson38, romberg, gauss, aLatex, n };
 })();

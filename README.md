@@ -20,6 +20,12 @@ están portados a JavaScript en `docs/metodos.js`.
 
 - Fórmulas, tablas y **procedimiento paso a paso en LaTeX** (KaTeX), con botón
   *Copiar LaTeX* para pegarlo en Overleaf y botón *Imprimir / PDF*.
+- **Diferenciación numérica:** diferencias progresiva, regresiva y centrada de 2, 3 y
+  5 puntos para `f'(x₀)`, con tabla comparativa de todas las fórmulas y error
+  frente a la derivada exacta.
+- **Integración numérica:** trapecio, Simpson 1/3, Simpson 3/8, Romberg y
+  cuadratura de Gauss-Legendre (1 a 30 puntos), con opción *Todos (comparar)*.
+  El error se mide contra un valor de referencia numérico.
 - Vista previa en LaTeX de lo que escribes (sistema, función, polinomio).
 - Accesible: navegación completa por teclado, compatible con lectores de
   pantalla, modo oscuro automático, adaptable a celular y errores junto al campo.

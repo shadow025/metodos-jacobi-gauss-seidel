@@ -22,6 +22,8 @@
     <button type="button" role="tab" id="tab-newton" aria-controls="panel-newton" aria-selected="false" tabindex="-1">Newton-Raphson</button>
     <button type="button" role="tab" id="tab-muller" aria-controls="panel-muller" aria-selected="false" tabindex="-1">Müller</button>
     <button type="button" role="tab" id="tab-bairstow" aria-controls="panel-bairstow" aria-selected="false" tabindex="-1">Bairstow</button>
+    <button type="button" role="tab" id="tab-diferenciacion" aria-controls="panel-diferenciacion" aria-selected="false" tabindex="-1">Diferenciación numérica</button>
+    <button type="button" role="tab" id="tab-integracion" aria-controls="panel-integracion" aria-selected="false" tabindex="-1">Integración numérica</button>
   </div>
 
   <main id="contenido">
@@ -216,6 +218,123 @@
       <div class="resultados">
         <p class="solo-lectores" id="b-estado" role="status"></p>
         <div id="b-resultados"><p class="vacio">Los resultados aparecerán aquí.</p></div>
+      </div>
+    </section>
+
+    <!-- ================= Diferenciación numérica ================= -->
+    <section class="panel" role="tabpanel" id="panel-diferenciacion" aria-labelledby="tab-diferenciacion" hidden>
+      <form id="d-form" class="tarjeta formulario" novalidate>
+        <h2>Diferenciación numérica</h2>
+        <div class="campo">
+          <label for="d-f">Función <span class="tex" data-tex="f(x)">f(x)</span></label>
+          <input id="d-f" type="text" spellcheck="false" autocomplete="off" autocapitalize="off" aria-describedby="d-sintaxis">
+        </div>
+        <div class="fila">
+          <div class="campo">
+            <label for="d-x0">Punto <span class="tex" data-tex="x_0">x0</span></label>
+            <input id="d-x0" type="text" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="campo">
+            <label for="d-h">Paso <span class="tex" data-tex="h">h</span></label>
+            <input id="d-h" type="text" spellcheck="false" autocomplete="off" aria-describedby="d-h-ayuda">
+          </div>
+        </div>
+        <p class="ayuda" id="d-h-ayuda">El paso debe ser mayor que 0. Un paso muy pequeño amplifica el error de redondeo.</p>
+        <fieldset class="opciones">
+          <legend>Tipo de diferencia</legend>
+          <label><input type="radio" name="d-tipo" value="progresiva" checked> Progresiva</label>
+          <label><input type="radio" name="d-tipo" value="regresiva"> Regresiva</label>
+          <label><input type="radio" name="d-tipo" value="centrada"> Centrada</label>
+        </fieldset>
+        <fieldset class="opciones">
+          <legend>Número de puntos</legend>
+          <label><input type="radio" name="d-puntos" value="2"> 2 puntos</label>
+          <label><input type="radio" name="d-puntos" value="3" checked> 3 puntos</label>
+          <label><input type="radio" name="d-puntos" value="5"> 5 puntos</label>
+        </fieldset>
+        <p class="ayuda" id="d-formula-ayuda">La diferencia centrada existe solo con 3 o 5 puntos.</p>
+        <details class="sintaxis" id="d-sintaxis">
+          <summary>Cómo escribir la función</summary>
+          <p>Usa <code>x</code> como variable. Potencia: <code>^</code>. Producto: <code>13x</code> o <code>13*x</code>.</p>
+          <p>Funciones: <code>sin</code>, <code>cos</code>, <code>tan</code>, <code>exp</code>, <code>log</code> (o <code>ln</code>), <code>log10</code>, <code>sqrt</code>, <code>abs</code>. Constantes: <code>pi</code>, <code>e</code>.</p>
+        </details>
+        <div class="vista-previa" id="d-previa" aria-label="Vista previa de la función"></div>
+        <p class="mensaje-error" id="d-error" role="alert" hidden></p>
+        <div class="botones">
+          <button type="button" class="secundario" id="d-ejemplo">Cargar ejemplo</button>
+          <button type="submit" class="primario">Resolver</button>
+        </div>
+      </form>
+      <div class="resultados">
+        <p class="solo-lectores" id="d-estado" role="status"></p>
+        <div id="d-resultados"><p class="vacio">Los resultados aparecerán aquí.</p></div>
+      </div>
+    </section>
+
+    <!-- ================= Integración numérica ================= -->
+    <section class="panel" role="tabpanel" id="panel-integracion" aria-labelledby="tab-integracion" hidden>
+      <form id="i-form" class="tarjeta formulario" novalidate>
+        <h2>Integración numérica</h2>
+        <div class="campo">
+          <label for="i-f">Función <span class="tex" data-tex="f(x)">f(x)</span></label>
+          <input id="i-f" type="text" spellcheck="false" autocomplete="off" autocapitalize="off" aria-describedby="i-sintaxis">
+        </div>
+        <div class="fila">
+          <div class="campo">
+            <label for="i-a">Límite inferior <span class="tex" data-tex="a">a</span></label>
+            <input id="i-a" type="text" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="campo">
+            <label for="i-b">Límite superior <span class="tex" data-tex="b">b</span></label>
+            <input id="i-b" type="text" spellcheck="false" autocomplete="off">
+          </div>
+        </div>
+        <div class="campo">
+          <label for="i-metodo">Método</label>
+          <select id="i-metodo">
+            <option value="trapecio">Trapecio compuesto</option>
+            <option value="simpson13">Simpson 1/3 compuesto</option>
+            <option value="simpson38">Simpson 3/8 compuesto</option>
+            <option value="romberg">Integración de Romberg</option>
+            <option value="gauss">Cuadratura de Gauss-Legendre</option>
+            <option value="todos">Todos (comparar)</option>
+          </select>
+        </div>
+        <div class="campo" data-usa="trapecio simpson13 simpson38 todos">
+          <label for="i-n">Subintervalos <span class="tex" data-tex="n">n</span></label>
+          <input id="i-n" type="text" inputmode="numeric" autocomplete="off" aria-describedby="i-n-ayuda">
+          <p class="ayuda" id="i-n-ayuda">Simpson 1/3 necesita n par; Simpson 3/8, n múltiplo de 3.</p>
+        </div>
+        <div class="fila" data-usa="romberg todos">
+          <div class="campo">
+            <label for="i-tol">Tolerancia <span class="tex" data-tex="\varepsilon_s\ (\%)">εs (%)</span></label>
+            <input id="i-tol" type="text" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="campo">
+            <label for="i-niveles">Máx. niveles</label>
+            <input id="i-niveles" type="text" inputmode="numeric" autocomplete="off">
+          </div>
+        </div>
+        <div class="campo" data-usa="gauss todos">
+          <label for="i-puntos">Puntos de Gauss</label>
+          <input id="i-puntos" type="text" inputmode="numeric" autocomplete="off" aria-describedby="i-puntos-ayuda">
+          <p class="ayuda" id="i-puntos-ayuda">Entero de 1 a 30. Con n puntos es exacta para polinomios de grado 2n − 1.</p>
+        </div>
+        <details class="sintaxis" id="i-sintaxis">
+          <summary>Cómo escribir la función</summary>
+          <p>Usa <code>x</code> como variable. Potencia: <code>^</code>. Producto: <code>13x</code> o <code>13*x</code>.</p>
+          <p>Funciones: <code>sin</code>, <code>cos</code>, <code>tan</code>, <code>exp</code>, <code>log</code> (o <code>ln</code>), <code>log10</code>, <code>sqrt</code>, <code>abs</code>. Constantes: <code>pi</code>, <code>e</code>.</p>
+        </details>
+        <div class="vista-previa" id="i-previa" aria-label="Vista previa de la integral"></div>
+        <p class="mensaje-error" id="i-error" role="alert" hidden></p>
+        <div class="botones">
+          <button type="button" class="secundario" id="i-ejemplo">Cargar ejemplo</button>
+          <button type="submit" class="primario">Resolver</button>
+        </div>
+      </form>
+      <div class="resultados">
+        <p class="solo-lectores" id="i-estado" role="status"></p>
+        <div id="i-resultados"><p class="vacio">Los resultados aparecerán aquí.</p></div>
       </div>
     </section>
   </main>

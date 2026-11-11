@@ -164,6 +164,17 @@ input[type="text"], textarea {
   padding: 0.55rem 0.7rem;
   min-height: 44px;
 }
+select {
+  width: 100%;
+  font: inherit;
+  color: var(--texto);
+  background: var(--superficie);
+  border: 1.5px solid var(--borde);
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
+  min-height: 44px;
+}
+[data-usa][hidden] { display: none; }
 textarea { resize: vertical; line-height: 1.5; }
 input[aria-invalid="true"], textarea[aria-invalid="true"] {
   border-color: var(--error);

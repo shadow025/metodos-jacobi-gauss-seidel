@@ -407,6 +407,18 @@
     }
   }
 
+  function vistaPreviaIntegral() {
+    const caja = $("i-previa");
+    try {
+      const f = Metodos.crearFuncion($("i-f").value);
+      const a = $("i-a").value.trim().replace(",", ".");
+      const b = $("i-b").value.trim().replace(",", ".");
+      caja.innerHTML = alineado([`I &= \\int_{${a || "a"}}^{${b || "b"}} ${f.tex}\\,dx`]);
+    } catch (exc) {
+      caja.replaceChildren();
+    }
+  }
+
   function resolverBairstow() {
     const coefs = leerLista($("b-coefs").value, "Coeficientes", "b-coefs");
     const r0 = leerNumero("b-r", "r inicial");
@@ -448,6 +460,190 @@
     }
     nodos.push(seccionProcedimiento("Método de Bairstow", Procedimiento.bairstow(r, tol), 3, $("b-estado")));
     return { nodos, estado: `${etiqueta}: ${r.raices.map((x) => fmt(x, 4)).join("; ")}.` };
+  }
+
+  // -------------------------------------------------------------------------
+  // Diferenciación numérica
+  // -------------------------------------------------------------------------
+
+  const radio = (nombre) => document.querySelector(`input[name="${nombre}"]:checked`).value;
+
+  function valorExacto(f, x0) {
+    const df = Metodos.derivadaSimbolica(f);
+    if (!df) return null;
+    try {
+      const v = Metodos.comoReal(df(x0));
+      return typeof v === "number" && Number.isFinite(v) ? v : null;
+    } catch (exc) {
+      return null;
+    }
+  }
+
+  const NOMBRE_TIPO = { progresiva: "progresiva", regresiva: "regresiva", centrada: "centrada" };
+  const ORDEN_TEXTO = { "O(h)": "O(h)", "O(h^2)": "O(h²)", "O(h^4)": "O(h⁴)" };
+
+  function resolverDiferenciacion() {
+    const f = leerFuncion("d-f", "f(x)");
+    const x0 = leerNumero("d-x0", "x0");
+    const h = leerNumero("d-h", "Paso h");
+    if (h <= 0) throw new ErrorDeCampo("El paso h debe ser mayor que 0.", "d-h");
+    const tipo = radio("d-tipo");
+    const puntos = Number(radio("d-puntos"));
+    const esquema = Metodos.buscarEsquema(tipo, puntos);
+    if (!esquema) throw new ErrorDeCampo("La diferencia centrada necesita 3 o 5 puntos; elige otro número de puntos.");
+
+    let r;
+    try {
+      r = Metodos.derivar(f, x0, h, esquema);
+    } catch (exc) {
+      throw new ErrorDeCampo(exc.message, "d-x0");
+    }
+    const exacto = valorExacto(f, x0);
+    const errorAbs = exacto === null ? null : Math.abs(r.valor - exacto);
+
+    const filasPuntos = r.puntos.map((p) => [p.k, fmt(p.x, 8), fmt(p.fx, 8), p.coef, fmt(p.coef * p.fx, 8)]);
+
+    const comparacion = Metodos.ESQUEMAS.map((e) => {
+      try {
+        const c = Metodos.derivar(f, x0, h, e);
+        const err = exacto === null ? "—" : Math.abs(c.valor - exacto).toExponential(3);
+        return [`${NOMBRE_TIPO[e.tipo]}, ${e.puntos} puntos`, fmt(c.valor, 10), err, ORDEN_TEXTO[e.error] || e.error];
+      } catch (exc) {
+        return [`${NOMBRE_TIPO[e.tipo]}, ${e.puntos} puntos`, "no definida", "—", e.error];
+      }
+    });
+
+    const etiqueta = `Diferencia ${NOMBRE_TIPO[tipo]} de ${puntos} puntos`;
+    const nodos = [
+      bloque("Resultado", 3, resumen(true, etiqueta,
+        el("div", { class: "valores" },
+          el("span", { html: tex(`f'(${numTex(x0)}) \\approx ${numTex(r.valor, 10)}`) }),
+          exacto === null ? null : el("span", { html: tex(`f'(${numTex(x0)}) = ${numTex(exacto, 10)}`) }),
+          errorAbs === null ? null : el("span", { html: tex(`\\text{error} = ${errorAbs.toExponential(3)}`) })),
+        el("p", { html: `Fórmula: ${tex(`f'(x_0) \\approx \\dfrac{${r.esquema.coefs.map((c, i) => [c, r.esquema.offsets[i]]).filter(([c]) => c !== 0)
+          .map(([c, k], i) => `${c < 0 ? "-" : i ? "+" : ""}${Math.abs(c) === 1 ? "" : Math.abs(c)}f_{${k}}`).join(" ")}}{${r.esquema.den === 1 ? "" : r.esquema.den}h}`)}`
+          + `, con error ${tex(r.esquema.error.replace(/\^(\d)/, "^{$1}"))}.` }))),
+      bloque("Puntos utilizados", 3, tabla("Puntos de la fórmula", ["k", "x_k", "f(x_k)", "\\text{coef.}", "\\text{coef.}\\cdot f(x_k)"], filasPuntos)),
+      bloque("Comparación de todas las fórmulas", 3, tabla("Todas las diferencias con el mismo x₀ y h",
+        ["\\text{Fórmula}", "f'(x_0)", "\\text{Error absoluto}", "\\text{Orden}"], comparacion)),
+      seccionProcedimiento("Diferenciación numérica", Procedimiento.derivada(f.tex, r, exacto), 3, $("d-estado")),
+    ];
+    return { nodos, estado: `${etiqueta}: f'(${fmt(x0, 4)}) ≈ ${fmt(r.valor, 8)}${exacto === null ? "" : `; valor exacto ${fmt(exacto, 8)}`}.` };
+  }
+
+  // -------------------------------------------------------------------------
+  // Integración numérica
+  // -------------------------------------------------------------------------
+
+  const NOMBRE_METODO = {
+    trapecio: "Trapecio compuesto", simpson13: "Simpson 1/3 compuesto", simpson38: "Simpson 3/8 compuesto",
+    romberg: "Integración de Romberg", gauss: "Cuadratura de Gauss-Legendre",
+  };
+
+  function leerEnteroEn(id, nombre, minimo, maximo) {
+    const texto = $(id).value.trim();
+    if (!/^\d+$/.test(texto) || Number(texto) < minimo || Number(texto) > maximo) {
+      throw new ErrorDeCampo(`«${nombre}» debe ser un entero entre ${minimo} y ${maximo}.`, id);
+    }
+    return Number(texto);
+  }
+
+  function actualizarCamposIntegral() {
+    const metodo = $("i-metodo").value;
+    document.querySelectorAll("#i-form [data-usa]").forEach((nodo) => {
+      nodo.hidden = !nodo.dataset.usa.split(" ").includes(metodo);
+    });
+  }
+
+  function articuloIntegral(r, f, referencia, estadoNodo) {
+    const nombre = NOMBRE_METODO[r.metodo];
+    const errorAbs = referencia === null ? null : Math.abs(r.integral - referencia);
+    const ok = r.metodo === "romberg" ? r.convergio : true;
+    const etiqueta = r.metodo === "romberg"
+      ? (r.convergio ? `Convergió en ${r.iteraciones} niveles` : `No convergió en ${r.iteraciones} niveles`)
+      : r.metodo === "gauss" ? `${r.n} puntos` : `${r.n} subintervalos`;
+    const resultado = bloque("Resultado", 4, resumen(ok, etiqueta,
+      el("div", { class: "valores" },
+        el("span", { html: tex(`I \\approx ${numTex(r.integral, 10)}`) }),
+        referencia === null ? null : el("span", { html: tex(`I_{\\text{ref}} = ${numTex(referencia, 10)}`) }),
+        errorAbs === null ? null : el("span", { html: tex(`\\text{error} = ${errorAbs.toExponential(3)}`) })),
+      referencia === null ? null : el("p", { class: "nota", texto: "El valor de referencia es numérico (Gauss-Legendre de 10 puntos sobre 16 subintervalos), no una integral exacta." })));
+
+    let tablaNodos;
+    let proc;
+    if (r.metodo === "romberg") {
+      const columnas = r.R.length;
+      const cabeceras = ["k", "n", "h", ...Array.from({ length: columnas }, (_, j) => `R_{k,${j}}`), "\\varepsilon_a\\ (\\%)"];
+      const filas = r.R.map((fila, k) => [k, r.niveles[k].n, fmt(r.niveles[k].h, 8),
+        ...Array.from({ length: columnas }, (_, j) => (j < fila.length ? fmt(fila[j], 8) : "")),
+        r.niveles[k].error === null ? "—" : fmt(r.niveles[k].error, 6)]);
+      tablaNodos = tabla("Tabla de Romberg", cabeceras, filas);
+      proc = Procedimiento.romberg(f.tex, r, referencia);
+    } else if (r.metodo === "gauss") {
+      const filas = r.nodos.map((q, i) => [i + 1, fmt(q.t, 10), fmt(q.w, 10), fmt(q.x, 10), fmt(q.fx, 10), fmt(q.w * q.fx, 10)]);
+      tablaNodos = tabla("Nodos y pesos de Gauss-Legendre", ["i", "t_i", "w_i", "x_i", "f(x_i)", "w_i\\,f(x_i)"], filas);
+      proc = Procedimiento.gauss(f.tex, r, referencia);
+    } else {
+      const filas = r.nodos.map((q) => [q.i, fmt(q.x, 8), fmt(q.fx, 8), q.coef, fmt(q.coef * q.fx, 8)]);
+      tablaNodos = tabla("Nodos de la regla", ["i", "x_i", "f(x_i)", "\\text{coef.}", "\\text{coef.}\\cdot f(x_i)"], filas);
+      proc = Procedimiento[r.metodo](f.tex, r, referencia);
+    }
+    return el("article", { class: "metodo" },
+      el("h3", { texto: nombre }),
+      resultado,
+      bloque("Tabla", 4, tablaNodos),
+      seccionProcedimiento(nombre, proc, 4, estadoNodo));
+  }
+
+  function resolverIntegracion() {
+    const f = leerFuncion("i-f", "f(x)");
+    const a = leerNumero("i-a", "Límite inferior");
+    const b = leerNumero("i-b", "Límite superior");
+    if (!(a < b)) throw new ErrorDeCampo("El límite inferior debe ser menor que el superior.", "i-a");
+    const metodo = $("i-metodo").value;
+    const usa = (m) => metodo === m || metodo === "todos";
+    const n = usa("trapecio") || usa("simpson13") || usa("simpson38") ? leerEnteroEn("i-n", "Subintervalos", 1, 100000) : null;
+    const tol = usa("romberg") ? leerTolerancia("i-tol") : null;
+    const niveles = usa("romberg") ? leerEnteroEn("i-niveles", "Máx. niveles", 1, 20) : null;
+    const puntos = usa("gauss") ? leerEnteroEn("i-puntos", "Puntos de Gauss", 1, 30) : null;
+
+    const corridas = [];
+    const omitidos = [];
+    const correr = (m, id, fn) => {
+      try {
+        corridas.push(fn());
+      } catch (exc) {
+        if (metodo === "todos" && /múltiplo|par/.test(exc.message)) omitidos.push(`${NOMBRE_METODO[m]}: ${exc.message}`);
+        else throw new ErrorDeCampo(exc.message, id);
+      }
+    };
+    if (usa("trapecio")) correr("trapecio", "i-n", () => Metodos.trapecio(f, a, b, n));
+    if (usa("simpson13")) correr("simpson13", "i-n", () => Metodos.simpson13(f, a, b, n));
+    if (usa("simpson38")) correr("simpson38", "i-n", () => Metodos.simpson38(f, a, b, n));
+    if (usa("romberg")) correr("romberg", "i-niveles", () => Metodos.romberg(f, a, b, tol, niveles));
+    if (usa("gauss")) correr("gauss", "i-puntos", () => Metodos.gaussLegendre(f, a, b, puntos));
+
+    let referencia = null;
+    try {
+      const v = Metodos.integralReferencia(f, a, b);
+      if (Number.isFinite(v)) referencia = v;
+    } catch (exc) {
+      referencia = null;
+    }
+
+    const estadoNodo = $("i-estado");
+    const nodos = [];
+    if (metodo === "todos") {
+      const filas = corridas.map((r) => [NOMBRE_METODO[r.metodo], fmt(r.integral, 10),
+        referencia === null ? "—" : Math.abs(r.integral - referencia).toExponential(3)]);
+      nodos.push(bloque("Comparación de métodos", 3, tabla("Todos los métodos aplicados a la misma integral",
+        ["\\text{Método}", "I", "\\text{Error absoluto}"], filas)));
+      if (omitidos.length) nodos.push(el("p", { class: "nota", texto: `No aplicados: ${omitidos.join(" ")}` }));
+    }
+    for (const r of corridas) nodos.push(articuloIntegral(r, f, referencia, estadoNodo));
+
+    const frases = corridas.map((r) => `${NOMBRE_METODO[r.metodo]}: ${fmt(r.integral, 8)}`);
+    return { nodos, estado: `Integral calculada. ${frases.join(". ")}.` };
   }
 
   // -------------------------------------------------------------------------
@@ -504,6 +700,24 @@
     { "m-f": "x^3 - 13x - 12", "m-x0": "4.5", "m-x1": "5.5", "m-x2": "5", "m-tol": "0.0001", "m-iter": "100" }, ponerValores);
   conectar("b", resolverBairstow,
     { "b-coefs": "1 -3.5 2.75 2.125 -3.875 1.25", "b-r": "-1", "b-s": "-1", "b-tol": "1", "b-iter": "100" }, ponerValores);
+
+  $("d-f").addEventListener("input", () => vistaPreviaFuncion("d-f", "d-previa"));
+  $("i-f").addEventListener("input", vistaPreviaIntegral);
+  ["i-a", "i-b"].forEach((id) => $(id).addEventListener("input", vistaPreviaIntegral));
+  $("i-metodo").addEventListener("change", actualizarCamposIntegral);
+
+  conectar("d", resolverDiferenciacion,
+    { "d-f": "sin(x)", "d-x0": "1", "d-h": "0.1" },
+    (ejemplo) => {
+      ponerValores(ejemplo);
+      document.querySelector('input[name="d-tipo"][value="progresiva"]').checked = true;
+      document.querySelector('input[name="d-puntos"][value="3"]').checked = true;
+    });
+  // Polinomio de Chapra & Canale (ejemplo de integración): valor exacto 1.640533
+  conectar("i", resolverIntegracion,
+    { "i-f": "0.2 + 25x - 200x^2 + 675x^3 - 900x^4 + 400x^5", "i-a": "0", "i-b": "0.8", "i-n": "6",
+      "i-tol": "0.0001", "i-niveles": "10", "i-puntos": "3" },
+    (ejemplo) => { ponerValores(ejemplo); $("i-metodo").value = "todos"; actualizarCamposIntegral(); });
 
   const inicial = $(`tab-${location.hash.slice(1)}`);
   if (inicial) activarPestana(inicial);

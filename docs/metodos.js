@@ -428,11 +428,201 @@ const Metodos = (() => {
     return texto;
   }
 
+  // -------------------------------------------------------------------------
+  // Diferenciación numérica
+  // -------------------------------------------------------------------------
+
+  /** f(x) como número real; si no lo es, error claro con el punto problemático. */
+  function valorRealEn(f, x) {
+    const v = comoReal(f(x));
+    if (esComplejo(v) || typeof v !== "number" || Number.isNaN(v)) {
+      throw new Error(`f(x) no es un número real en x = ${Number(x.toPrecision(8))}.`);
+    }
+    if (!Number.isFinite(v)) {
+      throw new Error(`f(x) no es finita en x = ${Number(x.toPrecision(8))}.`);
+    }
+    return v;
+  }
+
+  /**
+   * Fórmulas de f'(x0) con x_k = x0 + k·h y f_k = f(x_k):
+   *   f'(x0) ≈ (Σ coef_k · f_k) / (den · h)
+   */
+  const ESQUEMAS = [
+    { id: "progresiva-2", tipo: "progresiva", puntos: 2, offsets: [0, 1], coefs: [-1, 1], den: 1, error: "O(h)" },
+    { id: "regresiva-2", tipo: "regresiva", puntos: 2, offsets: [-1, 0], coefs: [-1, 1], den: 1, error: "O(h)" },
+    { id: "progresiva-3", tipo: "progresiva", puntos: 3, offsets: [0, 1, 2], coefs: [-3, 4, -1], den: 2, error: "O(h^2)" },
+    { id: "regresiva-3", tipo: "regresiva", puntos: 3, offsets: [-2, -1, 0], coefs: [1, -4, 3], den: 2, error: "O(h^2)" },
+    { id: "centrada-3", tipo: "centrada", puntos: 3, offsets: [-1, 0, 1], coefs: [-1, 0, 1], den: 2, error: "O(h^2)" },
+    { id: "progresiva-5", tipo: "progresiva", puntos: 5, offsets: [0, 1, 2, 3, 4], coefs: [-25, 48, -36, 16, -3], den: 12, error: "O(h^4)" },
+    { id: "regresiva-5", tipo: "regresiva", puntos: 5, offsets: [-4, -3, -2, -1, 0], coefs: [3, -16, 36, -48, 25], den: 12, error: "O(h^4)" },
+    { id: "centrada-5", tipo: "centrada", puntos: 5, offsets: [-2, -1, 0, 1, 2], coefs: [1, -8, 0, 8, -1], den: 12, error: "O(h^4)" },
+  ];
+
+  const buscarEsquema = (tipo, puntos) => ESQUEMAS.find((e) => e.tipo === tipo && e.puntos === puntos) || null;
+
+  /** Aproxima f'(x0) con el esquema dado y paso h > 0. */
+  function derivar(f, x0, h, esquema) {
+    const puntos = esquema.offsets.map((k, i) => {
+      const x = x0 + k * h;
+      return { k, x, fx: valorRealEn(f, x), coef: esquema.coefs[i] };
+    });
+    const numerador = puntos.reduce((s, p) => s + p.coef * p.fx, 0);
+    return { esquema, x0, h, puntos, numerador, valor: numerador / (esquema.den * h) };
+  }
+
+  // -------------------------------------------------------------------------
+  // Integración numérica
+  // -------------------------------------------------------------------------
+
+  function nodosEquiespaciados(f, a, b, n, coeficiente) {
+    const h = (b - a) / n;
+    const nodos = [];
+    for (let i = 0; i <= n; i++) {
+      const x = i === n ? b : a + i * h;
+      nodos.push({ i, x, fx: valorRealEn(f, x), coef: coeficiente(i, n) });
+    }
+    return { h, nodos };
+  }
+
+  function sumaPonderada(nodos) {
+    return nodos.reduce((s, p) => s + p.coef * p.fx, 0);
+  }
+
+  /** Regla del trapecio compuesta con n subintervalos. */
+  function trapecio(f, a, b, n) {
+    const { h, nodos } = nodosEquiespaciados(f, a, b, n, (i, N) => (i === 0 || i === N ? 1 : 2));
+    const suma = sumaPonderada(nodos);
+    return { metodo: "trapecio", a, b, n, h, nodos, suma, integral: (h / 2) * suma };
+  }
+
+  /** Simpson 1/3 compuesta (n par). */
+  function simpson13(f, a, b, n) {
+    if (n % 2 !== 0) throw new Error("Simpson 1/3 necesita un número par de subintervalos.");
+    const { h, nodos } = nodosEquiespaciados(f, a, b, n, (i, N) => (i === 0 || i === N ? 1 : i % 2 ? 4 : 2));
+    const suma = sumaPonderada(nodos);
+    return { metodo: "simpson13", a, b, n, h, nodos, suma, integral: (h / 3) * suma };
+  }
+
+  /** Simpson 3/8 compuesta (n múltiplo de 3). */
+  function simpson38(f, a, b, n) {
+    if (n % 3 !== 0) throw new Error("Simpson 3/8 necesita un número de subintervalos múltiplo de 3.");
+    const { h, nodos } = nodosEquiespaciados(f, a, b, n, (i, N) => (i === 0 || i === N ? 1 : i % 3 === 0 ? 2 : 3));
+    const suma = sumaPonderada(nodos);
+    return { metodo: "simpson38", a, b, n, h, nodos, suma, integral: (3 * h / 8) * suma };
+  }
+
+  /**
+   * Integración de Romberg (extrapolación de Richardson sobre el trapecio).
+   *   R[k][0] = trapecio con 2^k subintervalos
+   *   R[k][j] = (4^j R[k][j-1] − R[k-1][j-1]) / (4^j − 1)
+   * Se detiene cuando εa = |(R[k][k] − R[k-1][k-1]) / R[k][k]|·100 < tol.
+   */
+  function romberg(f, a, b, tol = 1e-6, maxNiveles = 10) {
+    const fa = valorRealEn(f, a);
+    const fb = valorRealEn(f, b);
+    const R = [[((b - a) / 2) * (fa + fb)]];
+    const niveles = [{ k: 0, n: 1, h: b - a, nuevos: [], sumaNuevos: 0, error: null }];
+    let convergio = false;
+
+    for (let k = 1; k < maxNiveles; k++) {
+      const n = 2 ** k;
+      const h = (b - a) / n;
+      const nuevos = [];
+      for (let i = 1; i < n; i += 2) {
+        const x = a + i * h;
+        nuevos.push({ x, fx: valorRealEn(f, x) });
+      }
+      const sumaNuevos = nuevos.reduce((s, p) => s + p.fx, 0);
+      const fila = [R[k - 1][0] / 2 + h * sumaNuevos];
+      for (let j = 1; j <= k; j++) {
+        const cuatro = 4 ** j;
+        fila.push((cuatro * fila[j - 1] - R[k - 1][j - 1]) / (cuatro - 1));
+      }
+      R.push(fila);
+      const error = errorRelativo(fila[k], R[k - 1][k - 1]);
+      niveles.push({ k, n, h, nuevos, sumaNuevos, error });
+      if (error < tol) { convergio = true; break; }
+    }
+    const ultimo = R.length - 1;
+    return { metodo: "romberg", a, b, R, niveles, convergio, tol, integral: R[ultimo][ultimo], iteraciones: ultimo };
+  }
+
+  const cacheLegendre = new Map();
+
+  /** Nodos y pesos de Gauss-Legendre de n puntos en [-1, 1] (Newton sobre P_n). */
+  function legendre(n) {
+    if (cacheLegendre.has(n)) return cacheLegendre.get(n);
+    const t = new Array(n);
+    const w = new Array(n);
+    const m = Math.floor((n + 1) / 2);
+    for (let i = 1; i <= m; i++) {
+      let z = Math.cos(Math.PI * (i - 0.25) / (n + 0.5));
+      let pp = 1;
+      for (let iter = 0; iter < 100; iter++) {
+        let p1 = 1;
+        let p2 = 0;
+        for (let j = 1; j <= n; j++) {
+          const p3 = p2;
+          p2 = p1;
+          p1 = ((2 * j - 1) * z * p2 - (j - 1) * p3) / j;
+        }
+        pp = n * (z * p1 - p2) / (z * z - 1);
+        const z1 = z;
+        z = z1 - p1 / pp;
+        if (Math.abs(z - z1) < 1e-15) break;
+      }
+      // derivada en la raíz final
+      let p1 = 1;
+      let p2 = 0;
+      for (let j = 1; j <= n; j++) {
+        const p3 = p2;
+        p2 = p1;
+        p1 = ((2 * j - 1) * z * p2 - (j - 1) * p3) / j;
+      }
+      pp = n * (z * p1 - p2) / (z * z - 1);
+      if (Math.abs(z) < 1e-15) z = 0;
+      const peso = 2 / ((1 - z * z) * pp * pp);
+      t[i - 1] = -z;
+      t[n - i] = z;
+      w[i - 1] = peso;
+      w[n - i] = peso;
+    }
+    const resultado = { t, w };
+    cacheLegendre.set(n, resultado);
+    return resultado;
+  }
+
+  /** Cuadratura de Gauss-Legendre de n puntos sobre [a, b]. */
+  function gaussLegendre(f, a, b, n) {
+    if (!Number.isInteger(n) || n < 1 || n > 30) throw new Error("El número de puntos debe ser un entero entre 1 y 30.");
+    const { t, w } = legendre(n);
+    const mitad = (b - a) / 2;
+    const centro = (b + a) / 2;
+    const nodos = t.map((ti, i) => {
+      const x = mitad * ti + centro;
+      return { t: ti, w: w[i], x, fx: valorRealEn(f, x) };
+    });
+    const suma = nodos.reduce((s, p) => s + p.w * p.fx, 0);
+    return { metodo: "gauss", a, b, n, mitad, centro, nodos, suma, integral: mitad * suma };
+  }
+
+  /** Valor de referencia: Gauss-Legendre de 10 puntos sobre 16 subintervalos. */
+  function integralReferencia(f, a, b) {
+    const partes = 16;
+    const ancho = (b - a) / partes;
+    let total = 0;
+    for (let i = 0; i < partes; i++) total += gaussLegendre(f, a + i * ancho, a + (i + 1) * ancho, 10).integral;
+    return total;
+  }
+
   return {
     esComplejo, comoReal, errorRelativo,
     esDiagonalmenteDominante, jacobi, gaussSeidel,
     crearFuncion, derivadaSimbolica, derivadaNumerica,
     newtonRaphson, muller, bairstow, raicesCuadratica, divisionSintetica,
     fmt, fijo, polinomioTex,
+    ESQUEMAS, buscarEsquema, derivar,
+    trapecio, simpson13, simpson38, romberg, legendre, gaussLegendre, integralReferencia,
   };
 })();
