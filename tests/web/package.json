@@ -1,0 +1,12 @@
+{
+  "name": "pruebas-version-web",
+  "private": true,
+  "description": "Prueba diferencial: compara la versión web (docs/) contra la versión Python.",
+  "scripts": {
+    "test": "python generar_referencia.py && node comparar.js"
+  },
+  "devDependencies": {
+    "katex": "0.16.11",
+    "mathjs": "12.4.2"
+  }
+}

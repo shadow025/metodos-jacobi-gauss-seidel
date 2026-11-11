@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Métodos Numéricos — Jacobi, Gauss-Seidel, Newton-Raphson, Müller y Bairstow</title>
+  <meta name="description" content="Calculadora web de métodos numéricos con tabla de iteraciones y procedimiento paso a paso en LaTeX.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+  <a class="saltar" href="#contenido">Saltar al contenido</a>
+
+  <header class="cabecera">
+    <h1>Métodos Numéricos</h1>
+    <p>Elige un método, ingresa los datos y presiona <strong>Resolver</strong> para ver la tabla de iteraciones y el procedimiento paso a paso.</p>
+  </header>
+
+  <div class="pestanas" role="tablist" aria-label="Métodos numéricos">
+    <button type="button" role="tab" id="tab-sistemas" aria-controls="panel-sistemas" aria-selected="true">Jacobi / Gauss-Seidel</button>
+    <button type="button" role="tab" id="tab-newton" aria-controls="panel-newton" aria-selected="false" tabindex="-1">Newton-Raphson</button>
+    <button type="button" role="tab" id="tab-muller" aria-controls="panel-muller" aria-selected="false" tabindex="-1">Müller</button>
+    <button type="button" role="tab" id="tab-bairstow" aria-controls="panel-bairstow" aria-selected="false" tabindex="-1">Bairstow</button>
+  </div>
+
+  <main id="contenido">
+    <p id="aviso-carga" class="mensaje-error" role="alert" hidden>
+      No se pudieron cargar las bibliotecas KaTeX y math.js. Revisa tu conexión a internet y recarga la página.
+    </p>
+    <noscript><p class="mensaje-error">Esta aplicación necesita JavaScript activado en el navegador.</p></noscript>
+
+    <!-- ================= Jacobi / Gauss-Seidel ================= -->
+    <section class="panel" role="tabpanel" id="panel-sistemas" aria-labelledby="tab-sistemas">
+      <form id="s-form" class="tarjeta formulario" novalidate>
+        <h2>Sistema <span class="tex" data-tex="A\mathbf{x} = \mathbf{b}">Ax = b</span></h2>
+
+        <div class="campo">
+          <label for="s-a">Matriz A</label>
+          <textarea id="s-a" rows="5" spellcheck="false" autocomplete="off" autocapitalize="off" aria-describedby="s-a-ayuda"></textarea>
+          <p class="ayuda" id="s-a-ayuda">Una fila por línea, valores separados por espacio.</p>
+        </div>
+        <div class="campo">
+          <label for="s-b">Vector b</label>
+          <input id="s-b" type="text" spellcheck="false" autocomplete="off" aria-describedby="s-b-ayuda">
+          <p class="ayuda" id="s-b-ayuda">Términos independientes separados por espacio.</p>
+        </div>
+        <div class="campo">
+          <label for="s-x0">Aproximación inicial <span class="tex" data-tex="\mathbf{x}^{(0)}">x0</span> <span class="opcional">(opcional)</span></label>
+          <input id="s-x0" type="text" spellcheck="false" autocomplete="off" aria-describedby="s-x0-ayuda">
+          <p class="ayuda" id="s-x0-ayuda">Si se deja vacío se usan ceros.</p>
+        </div>
+        <div class="fila">
+          <div class="campo">
+            <label for="s-tol">Tolerancia</label>
+            <input id="s-tol" type="text" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="campo">
+            <label for="s-iter">Máx. iteraciones</label>
+            <input id="s-iter" type="text" inputmode="numeric" autocomplete="off">
+          </div>
+        </div>
+        <fieldset class="opciones">
+          <legend>Método</legend>
+          <label><input type="radio" name="s-metodo" value="jacobi"> Jacobi</label>
+          <label><input type="radio" name="s-metodo" value="gs"> Gauss-Seidel</label>
+          <label><input type="radio" name="s-metodo" value="ambos" checked> Ambos</label>
+        </fieldset>
+
+        <div class="vista-previa" id="s-previa" aria-label="Vista previa del sistema"></div>
+        <p class="mensaje-error" id="s-error" role="alert" hidden></p>
+        <div class="botones">
+          <button type="button" class="secundario" id="s-ejemplo">Cargar ejemplo</button>
+          <button type="submit" class="primario">Resolver</button>
+        </div>
+      </form>
+      <div class="resultados">
+        <p class="solo-lectores" id="s-estado" role="status"></p>
+        <div id="s-resultados"><p class="vacio">Los resultados aparecerán aquí.</p></div>
+      </div>
+    </section>
+
+    <!-- ================= Newton-Raphson ================= -->
+    <section class="panel" role="tabpanel" id="panel-newton" aria-labelledby="tab-newton" hidden>
+      <form id="n-form" class="tarjeta formulario" novalidate>
+        <h2>Newton-Raphson</h2>
+        <div class="campo">
+          <label for="n-f">Función <span class="tex" data-tex="f(x)">f(x)</span></label>
+          <input id="n-f" type="text" spellcheck="false" autocomplete="off" autocapitalize="off" aria-describedby="n-sintaxis">
+        </div>
+        <div class="campo">
+          <label for="n-df">Derivada <span class="tex" data-tex="f'(x)">f'(x)</span> <span class="opcional">(opcional)</span></label>
+          <input id="n-df" type="text" spellcheck="false" autocomplete="off" autocapitalize="off" aria-describedby="n-df-ayuda">
+          <p class="ayuda" id="n-df-ayuda">Si se deja vacía se deriva automáticamente.</p>
+        </div>
+        <div class="campo">
+          <label for="n-x0">Valor inicial <span class="tex" data-tex="x_0">x0</span></label>
+          <input id="n-x0" type="text" spellcheck="false" autocomplete="off">
+        </div>
+        <div class="fila">
+          <div class="campo">
+            <label for="n-tol">Tolerancia <span class="tex" data-tex="\varepsilon_s\ (\%)">εs (%)</span></label>
+            <input id="n-tol" type="text" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="campo">
+            <label for="n-iter">Máx. iteraciones</label>
+            <input id="n-iter" type="text" inputmode="numeric" autocomplete="off">
+          </div>
+        </div>
+        <details class="sintaxis" id="n-sintaxis">
+          <summary>Cómo escribir la función</summary>
+          <p>Usa <code>x</code> como variable. Potencia: <code>^</code> o <code>**</code>. Producto: <code>13x</code> o <code>13*x</code>.</p>
+          <p>Funciones: <code>sin</code> (o <code>sen</code>), <code>cos</code>, <code>tan</code>, <code>exp</code>, <code>log</code> (o <code>ln</code>), <code>log10</code>, <code>sqrt</code>, <code>abs</code>. Constantes: <code>pi</code>, <code>e</code>.</p>
+          <p>Ejemplo: <code>exp(-x) - x</code></p>
+        </details>
+        <div class="vista-previa" id="n-previa" aria-label="Vista previa de la función"></div>
+        <p class="mensaje-error" id="n-error" role="alert" hidden></p>
+        <div class="botones">
+          <button type="button" class="secundario" id="n-ejemplo">Cargar ejemplo</button>
+          <button type="submit" class="primario">Resolver</button>
+        </div>
+      </form>
+      <div class="resultados">
+        <p class="solo-lectores" id="n-estado" role="status"></p>
+        <div id="n-resultados"><p class="vacio">Los resultados aparecerán aquí.</p></div>
+      </div>
+    </section>
+
+    <!-- ================= Müller ================= -->
+    <section class="panel" role="tabpanel" id="panel-muller" aria-labelledby="tab-muller" hidden>
+      <form id="m-form" class="tarjeta formulario" novalidate>
+        <h2>Müller</h2>
+        <div class="campo">
+          <label for="m-f">Función <span class="tex" data-tex="f(x)">f(x)</span></label>
+          <input id="m-f" type="text" spellcheck="false" autocomplete="off" autocapitalize="off" aria-describedby="m-sintaxis">
+        </div>
+        <div class="fila tres">
+          <div class="campo">
+            <label for="m-x0"><span class="tex" data-tex="x_0">x0</span></label>
+            <input id="m-x0" type="text" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="campo">
+            <label for="m-x1"><span class="tex" data-tex="x_1">x1</span></label>
+            <input id="m-x1" type="text" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="campo">
+            <label for="m-x2"><span class="tex" data-tex="x_2">x2</span></label>
+            <input id="m-x2" type="text" spellcheck="false" autocomplete="off">
+          </div>
+        </div>
+        <div class="fila">
+          <div class="campo">
+            <label for="m-tol">Tolerancia <span class="tex" data-tex="\varepsilon_s\ (\%)">εs (%)</span></label>
+            <input id="m-tol" type="text" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="campo">
+            <label for="m-iter">Máx. iteraciones</label>
+            <input id="m-iter" type="text" inputmode="numeric" autocomplete="off">
+          </div>
+        </div>
+        <details class="sintaxis" id="m-sintaxis">
+          <summary>Cómo escribir la función</summary>
+          <p>Usa <code>x</code> como variable. Potencia: <code>^</code> o <code>**</code>. Producto: <code>13x</code> o <code>13*x</code>.</p>
+          <p>Funciones: <code>sin</code> (o <code>sen</code>), <code>cos</code>, <code>tan</code>, <code>exp</code>, <code>log</code> (o <code>ln</code>), <code>log10</code>, <code>sqrt</code>, <code>abs</code>. Constantes: <code>pi</code>, <code>e</code>.</p>
+          <p>Müller puede encontrar raíces complejas, por ejemplo con <code>x^2 + 1</code>.</p>
+        </details>
+        <div class="vista-previa" id="m-previa" aria-label="Vista previa de la función"></div>
+        <p class="mensaje-error" id="m-error" role="alert" hidden></p>
+        <div class="botones">
+          <button type="button" class="secundario" id="m-ejemplo">Cargar ejemplo</button>
+          <button type="submit" class="primario">Resolver</button>
+        </div>
+      </form>
+      <div class="resultados">
+        <p class="solo-lectores" id="m-estado" role="status"></p>
+        <div id="m-resultados"><p class="vacio">Los resultados aparecerán aquí.</p></div>
+      </div>
+    </section>
+
+    <!-- ================= Bairstow ================= -->
+    <section class="panel" role="tabpanel" id="panel-bairstow" aria-labelledby="tab-bairstow" hidden>
+      <form id="b-form" class="tarjeta formulario" novalidate>
+        <h2>Bairstow</h2>
+        <div class="campo">
+          <label for="b-coefs">Coeficientes del polinomio</label>
+          <input id="b-coefs" type="text" spellcheck="false" autocomplete="off" aria-describedby="b-coefs-ayuda">
+          <p class="ayuda" id="b-coefs-ayuda">Del grado mayor al menor, separados por espacio. Ejemplo: x² − 3x + 2 se escribe <code>1 -3 2</code>.</p>
+        </div>
+        <div class="fila">
+          <div class="campo">
+            <label for="b-r"><span class="tex" data-tex="r">r</span> inicial</label>
+            <input id="b-r" type="text" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="campo">
+            <label for="b-s"><span class="tex" data-tex="s">s</span> inicial</label>
+            <input id="b-s" type="text" spellcheck="false" autocomplete="off">
+          </div>
+        </div>
+        <div class="fila">
+          <div class="campo">
+            <label for="b-tol">Tolerancia <span class="tex" data-tex="\varepsilon_s\ (\%)">εs (%)</span></label>
+            <input id="b-tol" type="text" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="campo">
+            <label for="b-iter">Máx. iteraciones</label>
+            <input id="b-iter" type="text" inputmode="numeric" autocomplete="off">
+          </div>
+        </div>
+        <div class="vista-previa" id="b-previa" aria-label="Vista previa del polinomio"></div>
+        <p class="mensaje-error" id="b-error" role="alert" hidden></p>
+        <div class="botones">
+          <button type="button" class="secundario" id="b-ejemplo">Cargar ejemplo</button>
+          <button type="submit" class="primario">Resolver</button>
+        </div>
+      </form>
+      <div class="resultados">
+        <p class="solo-lectores" id="b-estado" role="status"></p>
+        <div id="b-resultados"><p class="vacio">Los resultados aparecerán aquí.</p></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="pie">
+    <p>Métodos Numéricos — formulación de Chapra &amp; Canale, <cite>Métodos numéricos para ingenieros</cite>.</p>
+  </footer>
+
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjs@12.4.2/lib/browser/math.js"></script>
+  <script defer src="metodos.js"></script>
+  <script defer src="procedimiento.js"></script>
+  <script defer src="app.js"></script>
+</body>
+</html>

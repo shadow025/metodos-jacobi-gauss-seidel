@@ -12,7 +12,26 @@ para ingenieros* (secciones 6.2, 7.2 y 7.5) y reproducen sus ejemplos 6.3, 7.2 y
 
 📖 **Guía de uso paso a paso:** ver [`GUIA_DE_USO.md`](GUIA_DE_USO.md).
 
+## Versión web (sin instalar nada)
+
+Abre `docs/index.html` con doble clic en cualquier navegador (Chrome, Edge,
+Firefox, Safari, también en el celular). No necesita Python: los cinco métodos
+están portados a JavaScript en `docs/metodos.js`.
+
+- Fórmulas, tablas y **procedimiento paso a paso en LaTeX** (KaTeX), con botón
+  *Copiar LaTeX* para pegarlo en Overleaf y botón *Imprimir / PDF*.
+- Vista previa en LaTeX de lo que escribes (sistema, función, polinomio).
+- Accesible: navegación completa por teclado, compatible con lectores de
+  pantalla, modo oscuro automático, adaptable a celular y errores junto al campo.
+- Necesita internet para cargar KaTeX y math.js desde el CDN.
+
+Para publicarla gratis: en GitHub, *Settings → Pages → Deploy from a branch →
+main /docs*. Queda en `https://<usuario>.github.io/<repositorio>/`.
+
 ## Contenido
+
+- `docs/` — **versión web** (`index.html`, `app.js`, `metodos.js`,
+  `procedimiento.js`, `estilos.css`).
 
 - `interfaz.py` — **interfaz gráfica** (Tkinter) con una pestaña por método:
   ingresas los datos, presionas *Resolver* y ves la tabla de iteraciones, el
@@ -80,6 +99,24 @@ python interactivo.py
 ```bash
 python -m unittest discover -s tests
 ```
+
+### Pruebas de la versión web contra la versión Python
+
+`tests/web/` contiene una prueba diferencial: Python resuelve unos 2 300 casos
+(fijos y aleatorios con semilla fija) y la versión web resuelve los mismos; se
+compara cada número del resultado y del historial de iteraciones, el formato de
+los números y que el procedimiento en LaTeX se pueda dibujar y muestre los
+mismos valores.
+
+```bash
+cd tests/web
+npm install        # solo la primera vez (math.js y KaTeX)
+npm test           # genera la referencia con Python y compara
+```
+
+Las diferencias que la prueba acepta están explicadas en su salida (por
+ejemplo: la versión Python no puede evaluar `log10(x)` ni `1e-3` dentro de una
+expresión, y la web sí).
 
 ## Uso desde código
 
